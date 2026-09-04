@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Studio Pro</title>
+    <style>
+        :root {
+            --bg: #121214;
+            --panel: #1e1e24;
+            --panel-border: #2d2d38;
+            --accent: #00d2ff;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --text: #e1e1e6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* TOOLBAR TOP */
+        .toolbar {
+            background: var(--panel);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 6px 10px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 0 6px;
+            border-right: 1px solid var(--panel-border);
+            align-items: center;
+            justify-content: center;
+        }
+        .group:last-child { border-right: none; }
+
+        label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888899;
+        }
+
+        .row { display: flex; gap: 4px; align-items: center; }
+
+        /* MAIN LAYOUT */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+
+        /* SIDEBAR LEFT */
+        .sidebar {
+            background: var(--panel);
+            border-right: 1px solid var(--panel-border);
+            width: 240px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        /* WORKSPACE CANVAS */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0c;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 2px solid #333344;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            background-image: 
+                linear-gradient(45deg, #18181f 25%, transparent 25%), 
+                linear-gradient(-45deg, #18181f 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #18181f 75%), 
+                linear-gradient(-45deg, transparent 75%, #18181f 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+            cursor: crosshair;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+
+        /* TIMELINE BOTTOM */
+        .timeline-panel {
+            background: var(--panel);
+            border-top: 1px solid var(--panel-border);
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            padding: 6px;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .timeline-controls { display: flex; gap: 8px; align-items: center; }
+        .frames-strip {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 0;
+            flex: 1;
+        }
+
+        .frame-card {
+            min-width: 60px;
+            height: 60px;
+            background: #121214;
+            border: 2px solid #333;
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .frame-card.active { border-color: var(--accent); }
+        .frame-card canvas { width: 100%; height: 100%; object-fit: contain; }
+        .frame-card .frame-num {
+            position: absolute; top: 2px; left: 2px;
+            background: rgba(0,0,0,0.7); font-size: 9px; padding: 1px 4px; border-radius: 2px;
+        }
+
+        /* UI ELEMENTS */
+        button, select, input[type="text"], input[type="number"] {
+            background: #2a2a35;
+            color: var(--text);
+            border: 1px solid #3a3a48;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.15s ease;
+        }
+        button:hover, select:hover { background: #3a3a4a; border-color: #555566; }
+        button.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
+        button.danger { background: var(--danger); border-color: var(--danger); }
+        button.success { background: var(--success); border-color: var(--success); color: #000; }
+
+        .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+        .color-swatch { width: 18px; height: 18px; border-radius: 3px; cursor: pointer; border: 1px solid #444; }
+
+        .layer-item {
+            background: #252530;
+            border: 1px solid #353545;
+            padding: 6px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .layer-item.active { border-color: var(--accent); }
+
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: #333345; border-radius: 3px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="group">
+        <label>Format</label>
+        <select id="gridSize" onchange="changeGridSize()">
+            <option value="16x16">16 x 16</option>
+            <option value="32x32">32 x 32</option>
+            <option value="64x64" selected>64 x 64</option>
+            <option value="128x128">128 x 128</option>
+            <option value="custom">⚙️ Custom...</option>
+        </select>
+    </div>
+
+    <div class="group">
+        <label>Couleurs</label>
+        <div class="row">
+            <input type="color" id="colorPicker" value="#00d2ff" style="width:24px; height:24px; padding:0; border:none; cursor:pointer;">
+            <input type="color" id="colorPicker2" value="#ffffff" style="width:24px; height:24px; padding:0; border:none; cursor:pointer;">
+            <div class="palette" id="palette"></div>
+        </div>
+    </div>
+
+    <div class="group">
+        <label>Taille : <span id="sizeVal">1</span>px</label>
+        <input type="range" id="brushSize" min="1" max="32" value="1" style="width:50px;">
+    </div>
+
+    <div class="group">
+        <label>Outils Dessin</label>
+        <div class="row">
+            <button id="btn-pen" class="active" title="Crayon">✏️</button>
+            <button id="btn-eraser" title="Gomme">🧽</button>
+            <button id="btn-line" title="Ligne">📏</button>
+            <button id="btn-rect" title="Rectangle contour">🔲</button>
+            <button id="btn-rect-filled" title="Rectangle plein">⬛</button>
+            <button id="btn-circle" title="Cercle contour">⭕</button>
+            <button id="btn-circle-filled" title="Cercle plein">🔴</button>
+            <button id="btn-picker" title="Pipette">🧪</button>
+            <button id="btn-bucket" title="Pot de peinture">🫗</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label>Rendu & Effets</label>
+        <div class="row">
+            <button id="btn-blur" title="Flou Local">🌫️</button>
+            <button id="btn-airbrush" title="Aérographe">💨</button>
+            <button id="btn-dodge" title="Éclaircir">☀️</button>
+            <button id="btn-burn" title="Assombrir">🌙</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label>Transformations</label>
+        <div class="row">
+            <button onclick="rotateLayer()" title="Pivoter 90°">🔄 90°</button>
+            <button onclick="flipLayerX()" title="Flip Horizontal">↔️</button>
+            <button onclick="flipLayerY()" title="Flip Vertical">↕️</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label>Symétrie</label>
+        <div class="row">
+            <button id="btn-symX" onclick="toggleSymX()" title="Miroir X">M-X</button>
+            <button id="btn-symY" onclick="toggleSymY()" title="Miroir Y">M-Y</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label>Export Image</label>
+        <div class="row">
+            <select id="exportScale">
+                <option value="1">1x</option>
+                <option value="4" selected>4x</option>
+                <option value="8">8x</option>
+            </select>
+            <button class="success" onclick="exportPNG()">💾 PNG</button>
+            <button class="success" id="btn-export-gif" onclick="exportGIF()">🎞️ GIF</button>
+        </div>
+    </div>
+</div>
+
+<div class="main-layout">
+    <div class="sidebar">
+        <div>
+            <label>Calques (Frame Active)</label>
+            <div id="layers-list" style="display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
+            <button onclick="addLayer()" style="width:100%; margin-top:4px;">+ Nouveau Calque</button>
+            <button onclick="mergeLayers()" style="width:100%; margin-top:2px;">⬇️ Fusionner Bas</button>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--panel-border);">
+
+        <div>
+            <label>Importer Asset</label>
+            <input type="file" id="imp" hidden accept="image/*" onchange="importImage(event)">
+            <button onclick="document.getElementById('imp').click()" style="width:100%; margin-top:2px;">📂 Charger Image</button>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="canvas-container" id="container">
+            <canvas id="onion-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="timeline-panel">
+    <div class="timeline-controls">
+        <button id="btn-play-anim" onclick="toggleAnimation()">▶️ Play Anim</button>
+        <button onclick="addFrame()">➕ Frame</button>
+        <button onclick="duplicateFrame()">📋 Dupliquer</button>
+        <button class="danger" onclick="deleteFrame()">🗑️ Supprimer</button>
+        <div style="display:flex; align-items:center; gap:4px; margin-left:8px;">
+            <label>FPS:</label>
+            <input type="number" id="animFPS" value="8" min="1" max="60" style="width:40px;" onchange="updateFPS()">
+        </div>
+        <div style="display:flex; align-items:center; gap:4px; margin-left:8px;">
+            <input type="checkbox" id="onionSkinToggle" onchange="renderWorkspace()">
+            <label for="onionSkinToggle">Onion</label>
+            <input type="range" id="onionAlpha" min="0.1" max="0.8" step="0.1" value="0.3" style="width:40px;" onchange="renderWorkspace()">
+        </div>
+    </div>
+    <div class="frames-strip" id="framesStrip"></div>
+</div>
+
+<script>
+    let sizeW = 64, sizeH = 64;
+    let tool = 'pen';
+    let isDrawing = false;
+    let symX = false, symY = false;
+
+    let frames = []; 
+    let currentFrameIdx = 0;
+    let currentLayerIdx = 0;
+    let isPlayingAnim = false;
+    let animInterval = null;
+
+    let startX = 0, startY = 0;
+    let snapshotData = null;
+
+    const container = document.getElementById('container');
+    const colorPicker = document.getElementById('colorPicker');
+    const colorPicker2 = document.getElementById('colorPicker2');
+    const brushSizeInput = document.getElementById('brushSize');
+
+    function init() {
+        frames = [];
+        currentFrameIdx = 0;
+        addFrame();
+        setupPalette();
+        adjustCanvasSize();
+    }
+
+    function adjustCanvasSize() {
+        const availableHeight = container.parentElement.clientHeight - 40;
+        const availableWidth = container.parentElement.clientWidth - 40;
+        let dispH = availableHeight;
+        let dispW = dispH * (sizeW / sizeH);
+
+        if (dispW > availableWidth) {
+            dispW = availableWidth;
+            dispH = dispW * (sizeH / sizeW);
+        }
+
+        container.style.width = Math.floor(dispW) + 'px';
+        container.style.height = Math.floor(dispH) + 'px';
+    }
+
+    function addFrame() {
+        const frameLayers = [];
+        const canvas = document.createElement('canvas');
+        canvas.width = sizeW; canvas.height = sizeH;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        frameLayers.push({ canvas, ctx, visible: true, opacity: 1.0 });
+        
+        const insertIdx = frames.length > 0 ? currentFrameIdx + 1 : 0;
+        frames.splice(insertIdx, 0, { layers: frameLayers });
+        currentFrameIdx = insertIdx;
+        currentLayerIdx = 0;
+
+        renderWorkspace();
+        updateTimelineUI();
+    }
+
+    function duplicateFrame() {
+        const srcFrame = frames[currentFrameIdx];
+        const newLayers = srcFrame.layers.map(l => {
+            const canvas = document.createElement('canvas');
+            canvas.width = sizeW; canvas.height = sizeH;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(l.canvas, 0, 0);
+            return { canvas, ctx, visible: l.visible, opacity: l.opacity };
+        });
+
+        frames.splice(currentFrameIdx + 1, 0, { layers: newLayers });
+        currentFrameIdx++;
+        currentLayerIdx = 0;
+
+        renderWorkspace();
+        updateTimelineUI();
+    }
+
+    function deleteFrame() {
+        if (frames.length <= 1) return;
+        frames.splice(currentFrameIdx, 1);
+        currentFrameIdx = Math.max(0, currentFrameIdx - 1);
+        renderWorkspace();
+        updateTimelineUI();
+    }
+
+    function selectFrame(idx) {
+        currentFrameIdx = idx;
+        currentLayerIdx = 0;
+        renderWorkspace();
+        updateTimelineUI();
+    }
+
+    function addLayer() {
+        const curFrame = frames[currentFrameIdx];
+        const canvas = document.createElement('canvas');
+        canvas.width = sizeW; canvas.height = sizeH;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        curFrame.layers.push({ canvas, ctx, visible: true, opacity: 1.0 });
+        currentLayerIdx = curFrame.layers.length - 1;
+
+        renderWorkspace();
+        updateLayersUI();
+    }
+
+    function mergeLayers() {
+        const curFrame = frames[currentFrameIdx];
+        if (currentLayerIdx === 0) return;
+        
+        const top = curFrame.layers[currentLayerIdx];
+        const bottom = curFrame.layers[currentLayerIdx - 1];
+
+        bottom.ctx.globalAlpha = top.opacity;
+        bottom.ctx.drawImage(top.canvas, 0, 0);
+        bottom.ctx.globalAlpha = 1.0;
+
+        curFrame.layers.splice(currentLayerIdx, 1);
+        currentLayerIdx--;
+
+        renderWorkspace();
+        updateLayersUI();
+    }
+
+    function renderWorkspace() {
+        const existing = container.querySelectorAll('.active-layer-canvas');
+        existing.forEach(el => el.remove());
+
+        const curFrame = frames[currentFrameIdx];
+        
+        const onionCanvas = document.getElementById('onion-canvas');
+        onionCanvas.width = sizeW; onionCanvas.height = sizeH;
+        const oCtx = onionCanvas.getContext('2d');
+        oCtx.clearRect(0, 0, sizeW, sizeH);
+
+        const showOnion = document.getElementById('onionSkinToggle').checked;
+        if (showOnion && currentFrameIdx > 0) {
+            const prevFrame = frames[currentFrameIdx - 1];
+            oCtx.globalAlpha = parseFloat(document.getElementById('onionAlpha').value);
+            prevFrame.layers.forEach(l => {
+                if(l.visible) {
+                    oCtx.globalAlpha = parseFloat(document.getElementById('onionAlpha').value) * l.opacity;
+                    oCtx.drawImage(l.canvas, 0, 0);
+                }
+            });
+        }
+
+        curFrame.layers.forEach((layer, idx) => {
+            layer.canvas.className = 'active-layer-canvas';
+            layer.canvas.style.zIndex = idx + 1;
+            layer.canvas.style.visibility = layer.visible ? 'visible' : 'hidden';
+            layer.canvas.style.opacity = layer.opacity;
+            container.appendChild(layer.canvas);
+        });
+
+        updateLayersUI();
+    }
+
+    function updateLayersUI() {
+        const list = document.getElementById('layers-list');
+        list.innerHTML = '';
+        const curLayers = frames[currentFrameIdx].layers;
+
+        [...curLayers].reverse().forEach((layer, revIdx) => {
+            const i = curLayers.length - 1 - revIdx;
+            const div = document.createElement('div');
+            div.className = `layer-item ${i === currentLayerIdx ? 'active' : ''}`;
+            
+            const opacityPercent = Math.round(layer.opacity * 100);
+
+            div.innerHTML = `
+                <div class="row" style="justify-content:space-between; width:100%;">
+                    <strong onclick="currentLayerIdx=${i}; updateLayersUI();" style="cursor:pointer; flex:1;">Calque ${i+1}</strong>
+                    <button onclick="toggleLayerVis(${i})">${layer.visible ? '👁️' : '🚫'}</button>
+                </div>
+                <div class="row" style="width:100%; justify-content:space-between; font-size:9px;">
+                    <label style="font-size:8px;">Opacité: ${opacityPercent}%</label>
+                    <input type="range" min="0" max="1" step="0.05" value="${layer.opacity}" 
+                        oninput="changeLayerOpacity(${i}, this.value)" style="width:80px;">
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function changeLayerOpacity(idx, val) {
+        const layer = frames[currentFrameIdx].layers[idx];
+        layer.opacity = parseFloat(val);
+        layer.canvas.style.opacity = layer.opacity;
+        updateLayersUI();
+        updateTimelineUI();
+    }
+
+    function toggleLayerVis(idx) {
+        const l = frames[currentFrameIdx].layers[idx];
+        l.visible = !l.visible;
+        renderWorkspace();
+    }
+
+    function updateTimelineUI() {
+        const strip = document.getElementById('framesStrip');
+        strip.innerHTML = '';
+
+        frames.forEach((fr, idx) => {
+            const card = document.createElement('div');
+            card.className = `frame-card ${idx === currentFrameIdx ? 'active' : ''}`;
+            card.onclick = () => selectFrame(idx);
+
+            const num = document.createElement('div');
+            num.className = 'frame-num';
+            num.innerText = idx + 1;
+
+            const thumb = document.createElement('canvas');
+            thumb.width = sizeW; thumb.height = sizeH;
+            const tCtx = thumb.getContext('2d');
+            fr.layers.forEach(l => { 
+                if(l.visible) {
+                    tCtx.globalAlpha = l.opacity;
+                    tCtx.drawImage(l.canvas, 0, 0);
+                } 
+            });
+
+            card.appendChild(num);
+            card.appendChild(thumb);
+            strip.appendChild(card);
+        });
+    }
+
+    const getActiveCtx = () => frames[currentFrameIdx].layers[currentLayerIdx].ctx;
+
+    const getPos = e => {
+        const r = container.getBoundingClientRect();
+        return [
+            Math.floor((e.clientX - r.left) / (r.width / sizeW)),
+            Math.floor((e.clientY - r.top) / (r.height / sizeH))
+        ];
+    };
+
+    container.onmousedown = e => {
+        if(isPlayingAnim) return;
+        isDrawing = true;
+        [startX, startY] = getPos(e);
+        const ctx = getActiveCtx();
+        snapshotData = ctx.getImageData(0, 0, sizeW, sizeH);
+
+        if(tool === 'picker') {
+            const p = ctx.getImageData(startX, startY, 1, 1).data;
+            if(p[3] > 0) colorPicker.value = "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1);
+            isDrawing = false; return;
+        }
+
+        draw(e);
+    };
+
+    window.onmouseup = () => {
+        if(isDrawing) {
+            isDrawing = false;
+            updateTimelineUI();
+        }
+    };
+
+    container.onmousemove = e => {
+        if (!isDrawing) return;
+        const [x, y] = getPos(e);
+        const ctx = getActiveCtx();
+
+        if (['pen', 'eraser', 'blur', 'airbrush', 'dodge', 'burn'].includes(tool)) {
+            draw(e);
+        } else {
+            ctx.putImageData(snapshotData, 0, 0);
+            draw(e);
+        }
+    };
+
+    function draw(e) {
+        const [x, y] = getPos(e);
+        const bS = parseInt(brushSizeInput.value);
+        const ctx = getActiveCtx();
+        ctx.fillStyle = tool === 'eraser' ? 'rgba(0,0,0,0)' : colorPicker.value;
+
+        const applyPlot = (px, py) => {
+            const offset = Math.floor(bS / 2);
+            if (tool === 'eraser') ctx.clearRect(px - offset, py - offset, bS, bS);
+            else ctx.fillRect(px - offset, py - offset, bS, bS);
+
+            if (symX) {
+                const mirrorX = sizeW - 1 - px;
+                if (tool === 'eraser') ctx.clearRect(mirrorX - offset, py - offset, bS, bS);
+                else ctx.fillRect(mirrorX - offset, py - offset, bS, bS);
+            }
+            if (symY) {
+                const mirrorY = sizeH - 1 - py;
+                if (tool === 'eraser') ctx.clearRect(px - offset, mirrorY - offset, bS, bS);
+                else ctx.fillRect(px - offset, mirrorY - offset, bS, bS);
+            }
+        };
+
+        if (tool === 'pen' || tool === 'eraser') applyPlot(x, y);
+        else if (tool === 'line') drawLine(startX, startY, x, y, applyPlot);
+        else if (tool === 'rect') drawRect(startX, startY, x, y, false, applyPlot);
+        else if (tool === 'rect-filled') drawRect(startX, startY, x, y, true, applyPlot);
+        else if (tool === 'circle') drawCircle(startX, startY, x, y, false, applyPlot);
+        else if (tool === 'circle-filled') drawCircle(startX, startY, x, y, true, applyPlot);
+        else if (tool === 'airbrush') applyAirbrush(x, y, bS, colorPicker.value);
+        else if (tool === 'blur') applyBlur(x, y, bS);
+        else if (tool === 'dodge') applyLight(x, y, bS, 20);
+        else if (tool === 'burn') applyLight(x, y, bS, -20);
+        else if (tool === 'bucket') floodFill(x, y);
+    }
+
+    function drawLine(x0, y0, x1, y1, plotFn) {
+        const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        let err = dx + dy;
+        while (true) {
+            plotFn(x0, y0);
+            if (x0 === x1 && y0 === y1) break;
+            const e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    }
+
+    function drawRect(x0, y0, x1, y1, filled, plotFn) {
+        const minX = Math.min(x0, x1);
+        const maxX = Math.max(x0, x1);
+        const minY = Math.min(y0, y1);
+        const maxY = Math.max(y0, y1);
+
+        if (filled) {
+            for (let px = minX; px <= maxX; px++) {
+                for (let py = minY; py <= maxY; py++) {
+                    plotFn(px, py);
+                }
+            }
+        } else {
+            for (let px = minX; px <= maxX; px++) {
+                plotFn(px, minY);
+                plotFn(px, maxY);
+            }
+            for (let py = minY; py <= maxY; py++) {
+                plotFn(minX, py);
+                plotFn(maxX, py);
+            }
+        }
+    }
+
+    function drawCircle(x0, y0, x1, y1, filled, plotFn) {
+        const radius = Math.round(Math.hypot(x1 - x0, y1 - y0));
+        
+        if (filled) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    if (dx * dx + dy * dy <= radius * radius) {
+                        plotFn(x0 + dx, y0 + dy);
+                    }
+                }
+            }
+        } else {
+            let x = radius;
+            let y = 0;
+            let err = 0;
+
+            while (x >= y) {
+                plotFn(x0 + x, y0 + y);
+                plotFn(x0 + y, y0 + x);
+                plotFn(x0 - y, y0 + x);
+                plotFn(x0 - x, y0 + y);
+                plotFn(x0 - x, y0 - y);
+                plotFn(x0 - y, y0 - x);
+                plotFn(x0 + y, y0 - x);
+                plotFn(x0 + x, y0 - y);
+
+                if (err <= 0) {
+                    y += 1;
+                    err += 2 * y + 1;
+                }
+                if (err > 0) {
+                    x -= 1;
+                    err -= 2 * x + 1;
+                }
+            }
+        }
+    }
+
+    function applyAirbrush(cx, cy, radius, colorHex) {
+        const ctx = getActiveCtx();
+        ctx.fillStyle = colorHex;
+        for (let i = 0; i < radius * 4; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * radius;
+            const px = Math.floor(cx + r * Math.cos(angle));
+            const py = Math.floor(cy + r * Math.sin(angle));
+            if (px >= 0 && px < sizeW && py >= 0 && py < sizeH) {
+                ctx.globalAlpha = 0.2;
+                ctx.fillRect(px, py, 1, 1);
+            }
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    function applyBlur(cx, cy, size) {
+        const ctx = getActiveCtx();
+        const r = Math.floor(size / 2);
+        const imgData = ctx.getImageData(Math.max(0, cx-r), Math.max(0, cy-r), size, size);
+        const d = imgData.data;
+        let avgR = 0, avgG = 0, avgB = 0, count = 0;
+        for(let i=0; i<d.length; i+=4) {
+            if(d[i+3] > 0) { avgR += d[i]; avgG += d[i+1]; avgB += d[i+2]; count++; }
+        }
+        if(count === 0) return;
+        avgR = Math.floor(avgR/count); avgG = Math.floor(avgG/count); avgB = Math.floor(avgB/count);
+        for(let i=0; i<d.length; i+=4) {
+            if(d[i+3] > 0) {
+                d[i] = Math.floor((d[i] + avgR)/2);
+                d[i+1] = Math.floor((d[i+1] + avgG)/2);
+                d[i+2] = Math.floor((d[i+2] + avgB)/2);
+            }
+        }
+        ctx.putImageData(imgData, Math.max(0, cx-r), Math.max(0, cy-r));
+    }
+
+    function applyLight(cx, cy, size, delta) {
+        const ctx = getActiveCtx();
+        const r = Math.floor(size / 2);
+        const imgData = ctx.getImageData(Math.max(0, cx-r), Math.max(0, cy-r), size, size);
+        const d = imgData.data;
+        for(let i=0; i<d.length; i+=4) {
+            if(d[i+3] > 0) {
+                d[i] = Math.min(255, Math.max(0, d[i] + delta));
+                d[i+1] = Math.min(255, Math.max(0, d[i+1] + delta));
+                d[i+2] = Math.min(255, Math.max(0, d[i+2] + delta));
+            }
+        }
+        ctx.putImageData(imgData, Math.max(0, cx-r), Math.max(0, cy-r));
+    }
+
+    function floodFill(startX, startY) {
+        const ctx = getActiveCtx();
+        const img = ctx.getImageData(0, 0, sizeW, sizeH);
+        const data = img.data;
+        const targetIdx = (startY * sizeW + startX) * 4;
+        const targetR = data[targetIdx], targetG = data[targetIdx+1], targetB = data[targetIdx+2], targetA = data[targetIdx+3];
+
+        const fillR = parseInt(colorPicker.value.slice(1,3), 16);
+        const fillG = parseInt(colorPicker.value.slice(3,5), 16);
+        const fillB = parseInt(colorPicker.value.slice(5,7), 16);
+
+        if(targetR === fillR && targetG === fillG && targetB === fillB && targetA === 255) return;
+
+        const match = (x, y) => {
+            if (x < 0 || x >= sizeW || y < 0 || y >= sizeH) return false;
+            const idx = (y * sizeW + x) * 4;
+            return data[idx] === targetR && data[idx+1] === targetG && data[idx+2] === targetB && data[idx+3] === targetA;
+        };
+
+        const stack = [[startX, startY]];
+        while(stack.length) {
+            const [x, y] = stack.pop();
+            let lx = x; while (lx >= 0 && match(lx, y)) lx--; lx++;
+            let rx = x; while (rx < sizeW && match(rx, y)) rx++;
+
+            for (let i = lx; i < rx; i++) {
+                const idx = (y * sizeW + i) * 4;
+                data[idx] = fillR; data[idx+1] = fillG; data[idx+2] = fillB; data[idx+3] = 255;
+                if (y > 0 && match(i, y - 1)) stack.push([i, y - 1]);
+                if (y < sizeH - 1 && match(i, y + 1)) stack.push([i, y + 1]);
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+    }
+
+    function rotateLayer() {
+        const ctx = getActiveCtx();
+        const temp = document.createElement('canvas');
+        temp.width = sizeW; temp.height = sizeH;
+        const tCtx = temp.getContext('2d');
+        tCtx.drawImage(frames[currentFrameIdx].layers[currentLayerIdx].canvas, 0, 0);
+
+        ctx.clearRect(0, 0, sizeW, sizeH);
+        ctx.save();
+        ctx.translate(sizeW / 2, sizeH / 2);
+        ctx.rotate((90 * Math.PI) / 180);
+        ctx.drawImage(temp, -sizeW / 2, -sizeH / 2);
+        ctx.restore();
+        updateTimelineUI();
+    }
+
+    function flipLayerX() {
+        const ctx = getActiveCtx();
+        const temp = document.createElement('canvas');
+        temp.width = sizeW; temp.height = sizeH;
+        temp.getContext('2d').drawImage(frames[currentFrameIdx].layers[currentLayerIdx].canvas, 0, 0);
+
+        ctx.clearRect(0, 0, sizeW, sizeH);
+        ctx.save();
+        ctx.translate(sizeW, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(temp, 0, 0);
+        ctx.restore();
+        updateTimelineUI();
+    }
+
+    function flipLayerY() {
+        const ctx = getActiveCtx();
+        const temp = document.createElement('canvas');
+        temp.width = sizeW; temp.height = sizeH;
+        temp.getContext('2d').drawImage(frames[currentFrameIdx].layers[currentLayerIdx].canvas, 0, 0);
+
+        ctx.clearRect(0, 0, sizeW, sizeH);
+        ctx.save();
+        ctx.translate(0, sizeH);
+        ctx.scale(1, -1);
+        ctx.drawImage(temp, 0, 0);
+        ctx.restore();
+        updateTimelineUI();
+    }
+
+    function toggleSymX() { symX = !symX; document.getElementById('btn-symX').classList.toggle('active', symX); }
+    function toggleSymY() { symY = !symY; document.getElementById('btn-symY').classList.toggle('active', symY); }
+
+    function changeGridSize() {
+        const val = document.getElementById('gridSize').value;
+        if(val === 'custom') {
+            const w = prompt("Largeur:", sizeW);
+            const h = prompt("Hauteur:", sizeH);
+            if(w && h) { sizeW = parseInt(w); sizeH = parseInt(h); init(); }
+        } else {
+            const [w, h] = val.split('x').map(Number);
+            sizeW = w; sizeH = h; init();
+        }
+    }
+
+    function toggleAnimation() {
+        isPlayingAnim = !isPlayingAnim;
+        const btn = document.getElementById('btn-play-anim');
+        if (isPlayingAnim) {
+            btn.innerText = "⏸️ Pause";
+            const fps = parseInt(document.getElementById('animFPS').value);
+            animInterval = setInterval(() => {
+                currentFrameIdx = (currentFrameIdx + 1) % frames.length;
+                renderWorkspace();
+                updateTimelineUI();
+            }, 1000 / fps);
+        } else {
+            btn.innerText = "▶️ Play Anim";
+            clearInterval(animInterval);
+        }
+    }
+
+    function updateFPS() {
+        if (isPlayingAnim) { toggleAnimation(); toggleAnimation(); }
+    }
+
+    function importImage(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const img = new Image();
+            img.onload = function() {
+                const ctx = getActiveCtx();
+                ctx.clearRect(0, 0, sizeW, sizeH);
+                ctx.drawImage(img, 0, 0, sizeW, sizeH);
+                renderWorkspace();
+                updateTimelineUI();
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function getFlattenedFrameCanvas(frame) {
+        const c = document.createElement('canvas');
+        c.width = sizeW; c.height = sizeH;
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, sizeW, sizeH);
+        frame.layers.forEach(l => {
+            if (l.visible) {
+                ctx.globalAlpha = l.opacity;
+                ctx.drawImage(l.canvas, 0, 0);
+            }
+        });
+        return c;
+    }
+
+    function exportPNG() {
+        const scale = parseInt(document.getElementById('exportScale').value);
+        const curCanvas = getFlattenedFrameCanvas(frames[currentFrameIdx]);
+        
+        const out = document.createElement('canvas');
+        out.width = sizeW * scale; out.height = sizeH * scale;
+        const oCtx = out.getContext('2d');
+        oCtx.imageSmoothingEnabled = false;
+        oCtx.drawImage(curCanvas, 0, 0, out.width, out.height);
+
+        const a = document.createElement('a');
+        a.download = `pixelart_${Date.now()}.png`;
+        a.href = out.toDataURL('image/png');
+        a.click();
+    }
+
+    function exportGIF() {
+        const btn = document.getElementById('btn-export-gif');
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ Génération...";
+        btn.disabled = true;
+
+        const scale = parseInt(document.getElementById('exportScale').value);
+        const fps = parseInt(document.getElementById('animFPS').value);
+        const delay = Math.round(1000 / fps);
+
+        const gif = new GIF({
+            workers: 2,
+            quality: 1,
+            width: sizeW * scale,
+            height: sizeH * scale,
+            workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
+        });
+
+        frames.forEach(frame => {
+            const curCanvas = getFlattenedFrameCanvas(frame);
+            const scaledCanvas = document.createElement('canvas');
+            scaledCanvas.width = sizeW * scale;
+            scaledCanvas.height = sizeH * scale;
+            const ctx = scaledCanvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(curCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+            gif.addFrame(scaledCanvas, { delay: delay });
+        });
+
+        gif.on('finished', function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.download = `pixelart_anim_${Date.now()}.gif`;
+            a.href = url;
+            a.click();
+            btn.innerText = originalText;
+            btn.disabled = false;
+        });
+
+        gif.render();
+    }
+
+    function setupPalette() {
+        const colors = ['#000000','#ffffff','#ff0055','#00d2ff','#00ff66','#ffcc00','#ff6600','#9900ff','#777788','#444455'];
+        const pal = document.getElementById('palette');
+        pal.innerHTML = '';
+        colors.forEach(c => {
+            const s = document.createElement('div');
+            s.className = 'color-swatch';
+            s.style.backgroundColor = c;
+            s.onclick = () => colorPicker.value = c;
+            pal.appendChild(s);
+        });
+    }
+
+    document.querySelectorAll('button[id^="btn-"]').forEach(btn => {
+        btn.onclick = () => {
+            const id = btn.id.replace('btn-', '');
+            if (['pen', 'eraser', 'line', 'rect', 'rect-filled', 'circle', 'circle-filled', 'picker', 'bucket', 'blur', 'airbrush', 'dodge', 'burn'].includes(id)) {
+                document.querySelectorAll('button[id^="btn-"]').forEach(b => {
+                    if(!b.id.includes('sym') && b.id !== 'btn-export-gif') b.classList.remove('active');
+                });
+                btn.classList.add('active');
+                tool = id;
+            }
+        };
+    });
+
+    brushSizeInput.oninput = () => document.getElementById('sizeVal').innerText = brushSizeInput.value;
+    window.onresize = () => adjustCanvasSize();
+
+    init();
+</script>
+</body>
+</html>
