@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Zip Bundler Pro</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    
+    .container {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 680px;
+      padding: 30px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 { font-size: 1.5rem; color: var(--accent); margin-bottom: 8px; }
+    p.subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: rgba(56, 189, 248, 0.05); }
+    .dropzone input { display: none; }
+    .file-name { margin-top: 10px; font-weight: 600; color: var(--accent); }
+
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 20px 0 10px 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 10px 20px;
+      margin-bottom: 20px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .option-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--accent);
+      color: #000;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background-color: var(--accent-hover); }
+    button:disabled { background-color: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    #log {
+      margin-top: 20px;
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+      color: #a7f3d0;
+      display: none;
+    }
+    .log-line { margin-bottom: 4px; }
+    .log-error { color: #f87171; }
+    .log-info { color: #93c5fd; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>HTML Zip Bundler Pro</h1>
+    <p class="subtitle">Convertis ton projet web ZIP en un unique fichier HTML prêt à distribuer.</p>
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="zipInput" accept=".zip">
+      <div id="dropzoneText">Glisse ton fichier ZIP ici ou <span style="color: var(--accent); text-decoration: underline;">parcours tes fichiers</span></div>
+    </div>
+
+    <div class="section-title">Inlining & Fichiers</div>
+    <div class="options-grid">
+      <label class="option-item">
+        <input type="checkbox" id="includeCss" checked> Inline les fichiers CSS
+      </label>
+      <label class="option-item">
+        <input type="checkbox" id="includeJs" checked> Inline les scripts JS
+      </label>
+      <label class="option-item">
+        <input type="checkbox" id="includeImages" checked> Inline les images (Base64)
+      </label>
+      <label class="option-item">
+        <input type="checkbox" id="includeFonts" checked> Inline les polices d'écriture (.woff2, .ttf)
+      </label>
+    </div>
+
+    <div class="section-title">Réseau & Réductions</div>
+    <div class="options-grid">
+      <label class="option-item">
+        <input type="checkbox" id="downloadRemote"> Télécharger les CDN externes (HTTP/S)
+      </label>
+      <label class="option-item">
+        <input type="checkbox" id="minifyCss" checked> Minifier le CSS injecté
+      </label>
+      <label class="option-item">
+        <input type="checkbox" id="removeComments" checked> Supprimer les commentaires HTML/CSS
+      </label>
+    </div>
+
+    <button id="bundleBtn" disabled>Générer le Bundle Pro</button>
+
+    <div id="log"></div>
+  </div>
+
+  <script>
+    let zipFiles = {};
+    let selectedZip = null;
+
+    const zipInput = document.getElementById('zipInput');
+    const dropzone = document.getElementById('dropzone');
+    const dropzoneText = document.getElementById('dropzoneText');
+    const bundleBtn = document.getElementById('bundleBtn');
+    const logBox = document.getElementById('log');
+
+    function log(msg, type = 'success') {
+      logBox.style.display = 'block';
+      const div = document.createElement('div');
+      div.className = `log-line log-${type}`;
+      div.textContent = `> ${msg}`;
+      logBox.appendChild(div);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    dropzone.addEventListener('click', () => zipInput.click());
+    ['dragover', 'dragenter'].forEach(evt => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); }));
+    ['dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
+
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].name.endsWith('.zip')) {
+        zipInput.files = files;
+        handleFileSelect(files[0]);
+      }
+    });
+
+    zipInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+    });
+
+    function handleFileSelect(file) {
+      selectedZip = file;
+      dropzoneText.innerHTML = `Fichier prêt : <span class="file-name">${file.name}</span>`;
+      bundleBtn.disabled = false;
+      logBox.innerHTML = '';
+      log(`Chargé : ${file.name}`, 'info');
+    }
+
+    function cleanPath(path) {
+      const parts = path.split('/');
+      const stack = [];
+      for (const part of parts) {
+        if (part === '' || part === '.') continue;
+        if (part === '..') { if (stack.length > 0) stack.pop(); }
+        else { stack.push(part); }
+      }
+      return stack.join('/');
+    }
+
+    function resolveRelative(baseFile, relativePath) {
+      const baseDir = baseFile.includes('/') ? baseFile.substring(0, baseFile.lastIndexOf('/')) : '';
+      return cleanPath(baseDir ? `${baseDir}/${relativePath}` : relativePath);
+    }
+
+    function cleanCss(css) {
+      return css
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Supprime les commentaires
+        .replace(/\s+/g, ' ')             // Réduit les espaces multiples
+        .trim();
+    }
+
+    bundleBtn.addEventListener('click', async () => {
+      if (!selectedZip) return;
+
+      logBox.innerHTML = '';
+      bundleBtn.disabled = true;
+      log("Lecture du fichier ZIP...", 'info');
+
+      try {
+        const zip = await JSZip.loadAsync(selectedZip);
+        zipFiles = zip.files;
+
+        let htmlPath = Object.keys(zipFiles).find(name => name.toLowerCase().endsWith('index.html') && !zipFiles[name].dir);
+        if (!htmlPath) htmlPath = Object.keys(zipFiles).find(name => name.toLowerCase().endsWith('.html') && !zipFiles[name].dir);
+
+        if (!htmlPath) {
+          log("Erreur : Aucun fichier HTML dans le ZIP", 'error');
+          bundleBtn.disabled = false;
+          return;
+        }
+
+        log(`Fichier HTML source : ${htmlPath}`);
+
+        let htmlRaw = await zipFiles[htmlPath].async('string');
+        
+        // Option : Supprimer les commentaires HTML
+        if (document.getElementById('removeComments').checked) {
+          htmlRaw = htmlRaw.replace(/<!--(?!\[if)[\s\S]*?-->/g, '');
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlRaw, 'text/html');
+
+        const optCss = document.getElementById('includeCss').checked;
+        const optJs = document.getElementById('includeJs').checked;
+        const optImg = document.getElementById('includeImages').checked;
+        const optFonts = document.getElementById('includeFonts').checked;
+        const optRemote = document.getElementById('downloadRemote').checked;
+        const optMinCss = document.getElementById('minifyCss').checked;
+
+        // 1. Inlining CSS
+        if (optCss) {
+          const links = Array.from(doc.querySelectorAll('link[rel*="stylesheet"]'));
+          for (const link of links) {
+            const href = link.getAttribute('href');
+            if (!href) continue;
+
+            let cssText = null;
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+              if (optRemote) {
+                log(`Téléchargement CSS : ${href}`, 'info');
+                try {
+                  const res = await fetch(href);
+                  cssText = await res.text();
+                } catch (e) { log(`Échec CDN : ${href}`, 'error'); }
+              }
+            } else {
+              const targetPath = resolveRelative(htmlPath, href);
+              if (zipFiles[targetPath]) {
+                log(`Inline CSS : ${targetPath}`);
+                cssText = await zipFiles[targetPath].async('string');
+              }
+            }
+
+            if (cssText !== null) {
+              if (optMinCss) cssText = cleanCss(cssText);
+              const style = doc.createElement('style');
+              style.textContent = cssText;
+              link.replaceWith(style);
+            }
+          }
+        }
+
+        // 2. Inlining JS
+        if (optJs) {
+          const scripts = Array.from(doc.querySelectorAll('script[src]'));
+          for (const script of scripts) {
+            const src = script.getAttribute('src');
+            if (!src) continue;
+
+            let jsText = null;
+            if (src.startsWith('http://') || src.startsWith('https://')) {
+              if (optRemote) {
+                log(`Téléchargement JS : ${src}`, 'info');
+                try {
+                  const res = await fetch(src);
+                  jsText = await res.text();
+                } catch (e) { log(`Échec CDN : ${src}`, 'error'); }
+              }
+            } else {
+              const targetPath = resolveRelative(htmlPath, src);
+              if (zipFiles[targetPath]) {
+                log(`Inline JS : ${targetPath}`);
+                jsText = await zipFiles[targetPath].async('string');
+              }
+            }
+
+            if (jsText !== null) {
+              script.removeAttribute('src');
+              script.textContent = jsText;
+            }
+          }
+        }
+
+        // 3. Inlining Images
+        if (optImg) {
+          const imgs = Array.from(doc.querySelectorAll('img[src]'));
+          for (const img of imgs) {
+            const src = img.getAttribute('src');
+            if (!src || src.startsWith('data:')) continue;
+
+            if (!src.startsWith('http://') && !src.startsWith('https://')) {
+              const targetPath = resolveRelative(htmlPath, src);
+              if (zipFiles[targetPath]) {
+                log(`Inline Image : ${targetPath}`);
+                const blob = await zipFiles[targetPath].async('blob');
+                img.setAttribute('src', await blobToDataURL(blob));
+              }
+            }
+          }
+        }
+
+        // 4. Inlining Polices dans les balises <style>
+        if (optFonts) {
+          const styles = Array.from(doc.querySelectorAll('style'));
+          for (const style of styles) {
+            let css = style.textContent;
+            const fontMatches = [...css.matchAll(/url\((['"]?)([^'"\)]+\.(?:woff2|woff|ttf|otf|eot))\1\)/gi)];
+
+            for (const match of fontMatches) {
+              const fontPath = match[2];
+              if (!fontPath.startsWith('http') && !fontPath.startsWith('data:')) {
+                const targetPath = resolveRelative(htmlPath, fontPath);
+                if (zipFiles[targetPath]) {
+                  log(`Inline Police : ${targetPath}`);
+                  const blob = await zipFiles[targetPath].async('blob');
+                  const dataUrl = await blobToDataURL(blob);
+                  css = css.replace(match[0], `url("${dataUrl}")`);
+                }
+              }
+            }
+            style.textContent = css;
+          }
+        }
+
+        const bundledHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+        downloadFile(bundledHtml, 'bundled.html', 'text/html');
+        log("Bundle généré avec succès !", 'success');
+
+      } catch (err) {
+        log(`Erreur : ${err.message}`, 'error');
+      } finally {
+        bundleBtn.disabled = false;
+      }
+    });
+
+    function blobToDataURL(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function downloadFile(content, fileName, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
