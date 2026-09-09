@@ -3,115 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Store</title>
+    <title>Store GitHub</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
-            margin: 20px auto;
+            margin: 30px auto;
             padding: 0 20px;
             background-color: #f4f4f9;
             color: #333;
         }
-        h1 { color: #2c3e50; }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
         .category {
-            background: #fff;
-            padding: 15px;
-            margin-bottom: 20px;
+            background: #ffffff;
+            padding: 20px;
+            margin-bottom: 25px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .category h2 {
             margin-top: 0;
             color: #3498db;
             border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 5px;
+            padding-bottom: 8px;
         }
-        .item-list { list-style: none; padding: 0; }
+        .item-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
         .item-list li {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
+            padding: 10px 0;
             border-bottom: 1px solid #eee;
+        }
+        .item-list li:last-child {
+            border-bottom: none;
         }
         .btn-download {
             background-color: #2ecc71;
             color: white;
-            padding: 6px 12px;
-            text-decoration: none;
-            border-radius: 4px;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
             font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        .btn-download:hover { background-color: #27ae60; }
-        .loading { font-style: italic; color: #7f8c8d; }
+        .btn-download:hover {
+            background-color: #27ae60;
+        }
+        .btn-download:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            font-style: italic;
+            color: #7f8c8d;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Mon Store GitHub</h1>
+    <h1>Mon Store</h1>
     <div id="store-container">
         <p class="loading">Chargement du store en cours...</p>
     </div>
 
     <script>
-        // Place ici l'URL de ton fichier RAW principal
+        // Lien de ton fichier principal
         const MAIN_INDEX_URL = "https://raw.githubusercontent.com/Dracolink2/Tools/refs/heads/All_the_little_project_for_tools/Store.txt";
 
         async function loadStore() {
             const container = document.getElementById('store-container');
             
             try {
-                // 1. Récupération du fichier index principal
+                // 1. Récupération du fichier Store.txt
                 const response = await fetch(MAIN_INDEX_URL);
-                const textIndex = await response.text();
+                if (!response.ok) throw new Error("Impossible d'accéder au fichier principal.");
                 
-                // On sépare le fichier ligne par ligne (en ignorant les lignes vides)
+                const textIndex = await response.text();
                 const categoryUrls = textIndex.split('\n').map(line => line.trim()).filter(line => line.length > 0);
                 
                 container.innerHTML = ''; // On vide le message de chargement
 
-                // 2. Pour chaque lien de thème dans l'index principal...
+                // 2. Parcourt chaque lien de catégorie
                 for (const catUrl of categoryUrls) {
                     await loadCategory(catUrl, container);
                 }
 
             } catch (error) {
-                container.innerHTML = `<p style="color:red;">Erreur de chargement de l'index principal : ${error.message}</p>`;
+                container.innerHTML = `<p style="color:red; text-align:center;">Erreur : ${error.message}</p>`;
             }
         }
 
         async function loadCategory(catUrl, container) {
             try {
                 const response = await fetch(catUrl);
+                if (!response.ok) return;
+
                 const textCat = await response.text();
                 const lines = textCat.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
-                // La première ligne du fichier de catégorie peut être le nom du Thème (ex: "# Jeux")
-                // Les lignes suivantes sont les liens RAW des fichiers réels
-                let categoryName = "Thème sans nom";
+                if (lines.length === 0) return;
+
+                // Titre par défaut ou pris depuis la 1ère ligne si elle commence par #
+                let categoryName = "Thème";
                 let fileUrls = lines;
 
                 if (lines[0].startsWith('#')) {
                     categoryName = lines[0].replace('#', '').trim();
                     fileUrls = lines.slice(1);
+                } else {
+                    // Sinon, on extrait le nom du fichier de catégorie sans l'extension
+                    const urlParts = catUrl.split('/');
+                    categoryName = urlParts[urlParts.length - 1].replace(/\.[^/.]+$/, "");
                 }
 
-                // Création du bloc HTML pour cette catégorie
+                // Création du bloc HTML de la catégorie
                 const catDiv = document.createElement('div');
                 catDiv.className = 'category';
                 catDiv.innerHTML = `<h2>${categoryName}</h2><ul class="item-list"></ul>`;
                 const ul = catDiv.querySelector('ul');
 
-                // Ajout de chaque fichier dans la liste
+                // Ajout des fichiers
                 fileUrls.forEach(fileUrl => {
-                    // On extrait un nom propre depuis la fin de l'URL du fichier
-                    const fileName = fileUrl.split('/').pop() || fileUrl;
+                    const fileName = fileUrl.split('/').pop().split('?')[0] || "fichier";
                     
                     const li = document.createElement('li');
                     li.innerHTML = `
-                        <span>${fileName}</span>
-                        <a class="btn-download" href="${fileUrl}" target="_blank" download>Télécharger</a>
+                        <span><strong>${fileName}</strong></span>
+                        <button class="btn-download" onclick="downloadFile('${fileUrl}', '${fileName}', this)">Télécharger</button>
                     `;
                     ul.appendChild(li);
                 });
@@ -123,7 +151,39 @@
             }
         }
 
-        // Lancement au chargement de la page
+        // Fonction pour FORCER le téléchargement réel du fichier RAW
+        async function downloadFile(url, fileName, button) {
+            const originalText = button.innerText;
+            button.innerText = "Téléchargement...";
+            button.disabled = true;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Fichier introuvable");
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = fileName; // Force le nom et le téléchargement
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                // Nettoyage
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+            } catch (err) {
+                alert("Erreur lors du téléchargement : " + err.message);
+            } finally {
+                button.innerText = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // Démarrage
         loadStore();
     </script>
 </body>
