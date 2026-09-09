@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Store</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 { color: #2c3e50; }
+        .category {
+            background: #fff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .category h2 {
+            margin-top: 0;
+            color: #3498db;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        .item-list { list-style: none; padding: 0; }
+        .item-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .btn-download {
+            background-color: #2ecc71;
+            color: white;
+            padding: 6px 12px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .btn-download:hover { background-color: #27ae60; }
+        .loading { font-style: italic; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <h1>Mon Store GitHub</h1>
+    <div id="store-container">
+        <p class="loading">Chargement du store en cours...</p>
+    </div>
+
+    <script>
+        // Place ici l'URL de ton fichier RAW principal
+        const MAIN_INDEX_URL = "TON_LIEN_RAW_PRINCIPAL_ICI";
+
+        async function loadStore() {
+            const container = document.getElementById('store-container');
+            
+            try {
+                // 1. Récupération du fichier index principal
+                const response = await fetch(MAIN_INDEX_URL);
+                const textIndex = await response.text();
+                
+                // On sépare le fichier ligne par ligne (en ignorant les lignes vides)
+                const categoryUrls = textIndex.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                
+                container.innerHTML = ''; // On vide le message de chargement
+
+                // 2. Pour chaque lien de thème dans l'index principal...
+                for (const catUrl of categoryUrls) {
+                    await loadCategory(catUrl, container);
+                }
+
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;">Erreur de chargement de l'index principal : ${error.message}</p>`;
+            }
+        }
+
+        async function loadCategory(catUrl, container) {
+            try {
+                const response = await fetch(catUrl);
+                const textCat = await response.text();
+                const lines = textCat.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+                // La première ligne du fichier de catégorie peut être le nom du Thème (ex: "# Jeux")
+                // Les lignes suivantes sont les liens RAW des fichiers réels
+                let categoryName = "Thème sans nom";
+                let fileUrls = lines;
+
+                if (lines[0].startsWith('#')) {
+                    categoryName = lines[0].replace('#', '').trim();
+                    fileUrls = lines.slice(1);
+                }
+
+                // Création du bloc HTML pour cette catégorie
+                const catDiv = document.createElement('div');
+                catDiv.className = 'category';
+                catDiv.innerHTML = `<h2>${categoryName}</h2><ul class="item-list"></ul>`;
+                const ul = catDiv.querySelector('ul');
+
+                // Ajout de chaque fichier dans la liste
+                fileUrls.forEach(fileUrl => {
+                    // On extrait un nom propre depuis la fin de l'URL du fichier
+                    const fileName = fileUrl.split('/').pop() || fileUrl;
+                    
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>${fileName}</span>
+                        <a class="btn-download" href="${fileUrl}" target="_blank" download>Télécharger</a>
+                    `;
+                    ul.appendChild(li);
+                });
+
+                container.appendChild(catDiv);
+
+            } catch (error) {
+                console.error(`Erreur de chargement de la catégorie (${catUrl}):`, error);
+            }
+        }
+
+        // Lancement au chargement de la page
+        loadStore();
+    </script>
+</body>
+</html>
