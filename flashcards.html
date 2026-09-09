@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flashcards Widget Creator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.3rem; color: var(--accent); }
+
+    .app-layout { display: grid; grid-template-columns: 380px 1fr; flex: 1; height: calc(100vh - 60px); }
+
+    /* Panneau d'édition à gauche */
+    .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+    .section-title { font-size: 0.85rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 0.85rem; color: var(--muted); }
+    input[type="text"], textarea, select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 10px; font-size: 0.9rem;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+    .color-pickers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .color-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+    input[type="color"] { border: none; background: none; width: 30px; height: 30px; cursor: pointer; }
+
+    .btn { padding: 10px 15px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+    .btn-accent { background: var(--accent); color: #000; }
+    .btn-accent:hover { background: var(--accent-hover); }
+    .btn-export { background: #34d399; color: #000; margin-top: auto; padding: 14px; font-size: 1rem; }
+    .btn-export:hover { background: #10b981; }
+
+    .card-item { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+    .btn-del { background: #f87171; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+
+    /* Zone de prévisualisation à droite */
+    .preview-area { padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0b1120; }
+    .preview-frame { width: 100%; max-width: 600px; height: 100%; max-height: 500px; border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Générateur de Flashcards HTML</h1>
+    <button class="btn btn-export" onclick="exportWidgetHTML()">Télécharger le Widget (.html)</button>
+  </header>
+
+  <div class="app-layout">
+    <!-- Barre latérale / Configuration -->
+    <div class="sidebar">
+      
+      <div class="section-title">Paramètres Généraux</div>
+      <div class="form-group">
+        <label>Titre de l'application</label>
+        <input type="text" id="appTitle" value="Mes Cartes de Révision" oninput="updatePreview()">
+      </div>
+
+      <div class="color-pickers">
+        <div class="color-group">
+          <input type="color" id="primaryColor" value="#38bdf8" onchange="updatePreview()">
+          <span>Couleur Accent</span>
+        </div>
+        <div class="color-group">
+          <input type="color" id="bgColor" value="#0f172a" onchange="updatePreview()">
+          <span>Fond</span>
+        </div>
+      </div>
+
+      <div class="section-title">Ajouter une Carte</div>
+      <div class="form-group">
+        <label>Recto (Question / Définition)</label>
+        <textarea id="cardFront" placeholder="Ex: Capitale de la France ?"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Verso (Réponse)</label>
+        <textarea id="cardBack" placeholder="Ex: Paris"></textarea>
+      </div>
+      <button class="btn btn-accent" onclick="addCard()">Ajouter la carte</button>
+
+      <div class="section-title">Cartes dans le paquet (<span id="cardCount">0</span>)</div>
+      <div id="cardList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+    </div>
+
+    <!-- Zone de prévisualisation -->
+    <div class="preview-area">
+      <p style="color: var(--muted); margin-bottom: 10px; font-size: 0.9rem;">Aperçu en direct :</p>
+      <iframe id="previewFrame" class="preview-frame"></iframe>
+    </div>
+  </div>
+
+  <script>
+    let cards = [
+      { front: "Comment déclarer une fonction en JavaScript ?", back: "function maFonction() { ... }" },
+      { front: "Que signifie HTML ?", back: "HyperText Markup Language" }
+    ];
+
+    function renderCardList() {
+      const list = document.getElementById('cardList');
+      document.getElementById('cardCount').textContent = cards.length;
+      list.innerHTML = '';
+      cards.forEach((c, index) => {
+        const div = document.createElement('div');
+        div.className = 'card-item';
+        div.innerHTML = `
+          <span><strong>R:</strong> ${escapeHtml(c.front.substring(0, 20))}...</span>
+          <button class="btn-del" onclick="deleteCard(${index})">✕</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function addCard() {
+      const front = document.getElementById('cardFront').value.trim();
+      const back = document.getElementById('cardBack').value.trim();
+      if (!front || !back) return alert('Remplis le recto et le verso.');
+
+      cards.push({ front, back });
+      document.getElementById('cardFront').value = '';
+      document.getElementById('cardBack').value = '';
+      renderCardList();
+      updatePreview();
+    }
+
+    function deleteCard(index) {
+      cards.splice(index, 1);
+      renderCardList();
+      updatePreview();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Génère le code HTML complet du Widget autonome
+    function generateHTML() {
+      const title = document.getElementById('appTitle').value || 'Flashcards';
+      const accent = document.getElementById('primaryColor').value;
+      const bg = document.getElementById('bgColor').value;
+
+      return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root {
+      --bg: ${bg};
+      --accent: ${accent};
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    h1 { color: var(--accent); margin-bottom: 20px; font-size: 1.5rem; text-align: center; }
+    .flashcard { width: 100%; max-width: 480px; height: 280px; perspective: 1000px; cursor: pointer; }
+    .inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+    .flashcard.flipped .inner { transform: rotateY(180deg); }
+    .front, .back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; padding: 25px; border-radius: 12px; background: var(--card-bg); border: 1px solid #334155; font-size: 1.25rem; font-weight: 500; line-height: 1.4; word-break: break-word; }
+    .back { transform: rotateY(180deg); border-color: var(--accent); }
+    .controls { display: flex; gap: 10px; margin-top: 20px; width: 100%; max-width: 480px; }
+    button { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid #334155; }
+    .counter { margin-top: 15px; font-size: 0.85rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="flashcard" id="card" onclick="this.classList.toggle('flipped')">
+    <div class="inner">
+      <div class="front" id="front">--</div>
+      <div class="back" id="back">--</div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn-secondary" onclick="prevCard()">Précédent</button>
+    <button onclick="document.getElementById('card').classList.toggle('flipped')">Retourner</button>
+    <button class="btn-secondary" onclick="nextCard()">Suivant</button>
+  </div>
+  <div class="counter" id="counter">1 / 1</div>
+
+  <script>
+    const deck = ${JSON.stringify(cards)};
+    let idx = 0;
+    function render() {
+      document.getElementById('card').classList.remove('flipped');
+      if (deck.length === 0) return;
+      document.getElementById('front').textContent = deck[idx].front;
+      document.getElementById('back').textContent = deck[idx].back;
+      document.getElementById('counter').textContent = (idx + 1) + ' / ' + deck.length;
+    }
+    function nextCard() { if(deck.length) { idx = (idx + 1) % deck.length; render(); } }
+    function prevCard() { if(deck.length) { idx = (idx - 1 + deck.length) % deck.length; render(); } }
+    render();
+  <\/script>
+</body>
+</html>`;
+    }
+
+    function updatePreview() {
+      const frame = document.getElementById('previewFrame');
+      frame.srcdoc = generateHTML();
+    }
+
+    function exportWidgetHTML() {
+      const htmlContent = generateHTML();
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'flashcards.html';
+      a.click();
+    }
+
+    // Initialisation
+    renderCardList();
+    updatePreview();
+  </script>
+</body>
+</html>
